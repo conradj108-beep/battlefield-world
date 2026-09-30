@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 
+
 export class PlayerController {
 
     constructor(camera, terrain) {
@@ -12,9 +13,10 @@ export class PlayerController {
         this.camera = camera;
         this.terrain = terrain;
 
-        // -------------------------
+
+        // ====================================================
         // PLAYER POSITION
-        // -------------------------
+        // ====================================================
 
         this.position = new THREE.Vector3(
             0,
@@ -22,13 +24,15 @@ export class PlayerController {
             100
         );
 
-        // -------------------------
+
+        // ====================================================
         // MOVEMENT
-        // -------------------------
+        // ====================================================
 
         this.velocity = new THREE.Vector3();
 
         this.walkSpeed = 55;
+
         this.sprintSpeed = 95;
 
         this.jumpStrength = 28;
@@ -37,29 +41,36 @@ export class PlayerController {
 
         this.isGrounded = false;
 
-        // -------------------------
+
+        // ====================================================
         // CAMERA
-        // -------------------------
+        // ====================================================
 
         this.eyeHeight = 5.5;
 
         this.pitch = 0;
+
         this.yaw = 0;
 
         this.mouseSensitivity = 0.002;
 
-        // -------------------------
+
+        // ====================================================
         // INPUT
-        // -------------------------
+        // ====================================================
 
         this.keys = {};
 
         this.mouseLocked = false;
 
+
         this.setupKeyboard();
+
         this.setupMouse();
 
-        // Start camera
+
+        // Initial camera position
+
         this.updateCamera();
 
     }
@@ -77,7 +88,9 @@ export class PlayerController {
 
                 this.keys[event.code] = true;
 
+
                 // Prevent browser scrolling
+
                 if (
                     event.code === "Space" ||
                     event.code === "ArrowUp" ||
@@ -139,20 +152,28 @@ export class PlayerController {
             "mousemove",
             (event) => {
 
-                if (!this.mouseLocked) return;
+                if (!this.mouseLocked) {
 
+                    return;
+
+                }
+
+
+                // Horizontal camera movement
 
                 this.yaw -=
                     event.movementX *
                     this.mouseSensitivity;
 
 
+                // Vertical camera movement
+
                 this.pitch -=
                     event.movementY *
                     this.mouseSensitivity;
 
 
-                // Stop player looking completely upside down
+                // Prevent looking completely upside down
 
                 const limit =
                     Math.PI / 2 - 0.05;
@@ -180,13 +201,10 @@ export class PlayerController {
     getTerrainHeight(x, z) {
 
         /*
-           The terrain in our first prototype is generated
-           procedurally using the same basic mathematical
-           functions.
-
-           We reproduce those functions here so the player
-           can follow the landscape.
+            This matches the terrain generation
+            used by index.html.
         */
+
 
         let height = 0;
 
@@ -222,7 +240,8 @@ export class PlayerController {
             );
 
 
-        height += mountain * 60;
+        height +=
+            mountain * 60;
 
 
         return height;
@@ -231,28 +250,43 @@ export class PlayerController {
 
 
     // ========================================================
-    // UPDATE
+    // UPDATE PLAYER
     // ========================================================
 
     update(delta) {
 
-        if (!delta) return;
+        if (!delta) {
+
+            return;
+
+        }
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // MOVEMENT DIRECTION
-        // ----------------------------------------------------
+        // ====================================================
 
         const direction =
             new THREE.Vector3();
 
 
+        /*
+            IMPORTANT:
+
+            W = FORWARD
+            S = BACKWARD
+
+            The negative values here make the
+            camera's forward direction match
+            normal FPS controls.
+        */
+
         const forward =
-    new THREE.Vector3(
-        -Math.sin(this.yaw),
-        0,
-        -Math.cos(this.yaw)
-    );
+            new THREE.Vector3(
+                -Math.sin(this.yaw),
+                0,
+                -Math.cos(this.yaw)
+            );
 
 
         const right =
@@ -263,50 +297,74 @@ export class PlayerController {
             );
 
 
+        // W = forward
+
         if (
             this.keys["KeyW"] ||
             this.keys["ArrowUp"]
         ) {
 
-            direction.add(forward);
+            direction.add(
+                forward
+            );
 
         }
 
+
+        // S = backward
 
         if (
             this.keys["KeyS"] ||
             this.keys["ArrowDown"]
         ) {
 
-            direction.sub(forward);
+            direction.sub(
+                forward
+            );
 
         }
 
 
-        if (this.keys["KeyD"]) {
+        // D = right
 
-            direction.add(right);
+        if (
+            this.keys["KeyD"]
+        ) {
+
+            direction.add(
+                right
+            );
 
         }
 
 
-        if (this.keys["KeyA"]) {
+        // A = left
 
-            direction.sub(right);
+        if (
+            this.keys["KeyA"]
+        ) {
+
+            direction.sub(
+                right
+            );
 
         }
 
 
-        if (direction.lengthSq() > 0) {
+        // Normalize diagonal movement
+
+        if (
+            direction.lengthSq() > 0
+        ) {
 
             direction.normalize();
 
         }
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // SPEED
-        // ----------------------------------------------------
+        // ====================================================
 
         let speed =
             this.walkSpeed;
@@ -323,9 +381,9 @@ export class PlayerController {
         }
 
 
-        // ----------------------------------------------------
-        // HORIZONTAL MOVEMENT
-        // ----------------------------------------------------
+        // ====================================================
+        // HORIZONTAL VELOCITY
+        // ====================================================
 
         this.velocity.x =
             direction.x *
@@ -337,18 +395,18 @@ export class PlayerController {
             speed;
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // GRAVITY
-        // ----------------------------------------------------
+        // ====================================================
 
         this.velocity.y +=
             this.gravity *
             delta;
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // JUMP
-        // ----------------------------------------------------
+        // ====================================================
 
         if (
             this.keys["Space"] &&
@@ -358,15 +416,16 @@ export class PlayerController {
             this.velocity.y =
                 this.jumpStrength;
 
+
             this.isGrounded =
                 false;
 
         }
 
 
-        // ----------------------------------------------------
-        // APPLY VELOCITY
-        // ----------------------------------------------------
+        // ====================================================
+        // APPLY MOVEMENT
+        // ====================================================
 
         this.position.x +=
             this.velocity.x *
@@ -383,9 +442,9 @@ export class PlayerController {
             delta;
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // TERRAIN COLLISION
-        // ----------------------------------------------------
+        // ====================================================
 
         const ground =
             this.getTerrainHeight(
@@ -407,8 +466,10 @@ export class PlayerController {
             this.position.y =
                 minimumHeight;
 
+
             this.velocity.y =
                 0;
+
 
             this.isGrounded =
                 true;
@@ -416,9 +477,9 @@ export class PlayerController {
         }
 
 
-        // ----------------------------------------------------
-        // WORLD BOUNDS
-        // ----------------------------------------------------
+        // ====================================================
+        // WORLD BOUNDARIES
+        // ====================================================
 
         const limit =
             850;
@@ -444,9 +505,9 @@ export class PlayerController {
             );
 
 
-        // ----------------------------------------------------
-        // CAMERA
-        // ----------------------------------------------------
+        // ====================================================
+        // UPDATE CAMERA
+        // ====================================================
 
         this.updateCamera();
 
@@ -454,7 +515,7 @@ export class PlayerController {
 
 
     // ========================================================
-    // CAMERA UPDATE
+    // CAMERA
     // ========================================================
 
     updateCamera() {
