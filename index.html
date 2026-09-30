@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Project Battlefield</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #05070a;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #game {
+            position: fixed;
+            inset: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* -------------------------
+           CINEMATIC INTRO
+        ------------------------- */
+
+        #intro {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+
+            color: white;
+            background:
+                radial-gradient(
+                    circle at center,
+                    rgba(40, 55, 70, 0.35),
+                    rgba(0, 0, 0, 0.98)
+                );
+
+            transition:
+                opacity 2s ease,
+                visibility 2s ease;
+        }
+
+        #intro.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .classified {
+            font-size: 12px;
+            letter-spacing: 7px;
+            color: #aab6bd;
+            margin-bottom: 25px;
+        }
+
+        .title {
+            font-size: clamp(42px, 8vw, 100px);
+            font-weight: 300;
+            letter-spacing: 12px;
+            text-align: center;
+            margin: 0;
+
+            text-shadow:
+                0 0 20px rgba(255,255,255,.15),
+                0 4px 30px rgba(0,0,0,.8);
+        }
+
+        .subtitle {
+            margin-top: 18px;
+            color: #9aa6ad;
+            letter-spacing: 5px;
+            font-size: 13px;
+        }
+
+        .loading {
+            position: absolute;
+            bottom: 70px;
+
+            width: min(360px, 70vw);
+            height: 2px;
+
+            background: rgba(255,255,255,.15);
+        }
+
+        .loadingBar {
+            width: 0%;
+            height: 100%;
+
+            background: #d8e2e7;
+            box-shadow: 0 0 15px rgba(220,240,255,.5);
+
+            transition: width .15s linear;
+        }
+
+        /* -------------------------
+           MINIMAL HUD
+        ------------------------- */
+
+        #hud {
+            position: fixed;
+            inset: 0;
+
+            pointer-events: none;
+            z-index: 10;
+
+            color: rgba(255,255,255,.8);
+
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        #hud.visible {
+            opacity: 1;
+        }
+
+        .coordinates {
+            position: absolute;
+            top: 25px;
+            left: 28px;
+
+            font-size: 11px;
+            letter-spacing: 3px;
+
+            color: rgba(255,255,255,.55);
+        }
+
+        .status {
+            position: absolute;
+            bottom: 28px;
+            left: 28px;
+
+            font-size: 10px;
+            letter-spacing: 3px;
+
+            color: rgba(255,255,255,.5);
+        }
+
+        .crosshair {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+
+            width: 22px;
+            height: 22px;
+
+            transform: translate(-50%, -50%);
+
+            opacity: .35;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: "";
+
+            position: absolute;
+            background: rgba(255,255,255,.8);
+        }
+
+        .crosshair::before {
+            width: 1px;
+            height: 22px;
+            left: 10px;
+            top: 0;
+        }
+
+        .crosshair::after {
+            width: 22px;
+            height: 1px;
+            left: 0;
+            top: 10px;
+        }
+
+        .location {
+            position: absolute;
+            bottom: 28px;
+            right: 28px;
+
+            text-align: right;
+
+            font-size: 10px;
+            letter-spacing: 3px;
+
+            color: rgba(255,255,255,.5);
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="game"></div>
+
+<!-- INTRO -->
+
+<div id="intro">
+
+    <div class="classified">
+        FIELD OPERATIONS DIVISION
+    </div>
+
+    <h1 class="title">
+        PROJECT BATTLEFIELD
+    </h1>
+
+    <div class="subtitle">
+        OPEN WORLD ENVIRONMENT // PROTOTYPE
+    </div>
+
+    <div class="loading">
+        <div class="loadingBar" id="loadingBar"></div>
+    </div>
+
+</div>
+
+
+<!-- HUD -->
+
+<div id="hud">
+
+    <div class="coordinates">
+        34° 12' 08" N &nbsp; / &nbsp; 117° 41' 22" W
+    </div>
+
+    <div class="crosshair"></div>
+
+    <div class="status">
+        ENVIRONMENT ONLINE
+    </div>
+
+    <div class="location">
+        SECTOR 01<br>
+        UNKNOWN TERRITORY
+    </div>
+
+</div>
+
+
+<!-- THREE.JS -->
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+    }
+}
+</script>
+
+
+<script type="module">
+
+import * as THREE from "three";
+
+
+/* =====================================================
+   BASIC ENGINE
+===================================================== */
+
+const scene = new THREE.Scene();
+
+
+/* =====================================================
+   SKY
+===================================================== */
+
+scene.background = new THREE.Color(0x9fb4c2);
+
+scene.fog = new THREE.FogExp2(
+    0x9fb4c2,
+    0.0025
+);
+
+
+/* =====================================================
+   CAMERA
+===================================================== */
+
+const camera = new THREE.PerspectiveCamera(
+    65,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    5000
+);
+
+camera.position.set(
+    0,
+    45,
+    100
+);
+
+
+/* =====================================================
+   RENDERER
+===================================================== */
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: "high-performance"
+});
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+document
+    .getElementById("game")
+    .appendChild(renderer.domElement);
+
+
+/* =====================================================
+   LIGHTING
+===================================================== */
+
+const ambient = new THREE.HemisphereLight(
+    0xbfd3df,
+    0x283028,
+    2.0
+);
+
+scene.add(ambient);
+
+
+const sun = new THREE.DirectionalLight(
+    0xffe5c0,
+    4
+);
+
+sun.position.set(
+    -300,
+    500,
+    -250
+);
+
+sun.castShadow = true;
+
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+
+sun.shadow.camera.left = -500;
+sun.shadow.camera.right = 500;
+sun.shadow.camera.top = 500;
+sun.shadow.camera.bottom = -500;
+
+scene.add(sun);
+
+
+/* =====================================================
+   TERRAIN
+===================================================== */
+
+const terrainSize = 1800;
+
+const geometry = new THREE.PlaneGeometry(
+    terrainSize,
+    terrainSize,
+    180,
+    180
+);
+
+const positions =
+    geometry.attributes.position;
+
+
+for (
+    let i = 0;
+    i < positions.count;
+    i++
+) {
+
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+
+    let height = 0;
+
+    height +=
+        Math.sin(x * 0.012) *
+        Math.cos(y * 0.010) *
+        18;
+
+    height +=
+        Math.sin(x * 0.027 + 2) *
+        Math.cos(y * 0.018) *
+        8;
+
+    height +=
+        Math.sin(x * 0.055) *
+        Math.cos(y * 0.041) *
+        3;
+
+    /*
+       Large rolling landscape features
+    */
+
+    const mountain =
+        Math.max(
+            0,
+            1 -
+            Math.sqrt(
+                x * x +
+                (y + 350) *
+                (y + 350)
+            ) / 650
+        );
+
+    height += mountain * 60;
+
+    positions.setZ(
+        i,
+        height
+    );
+}
+
+geometry.computeVertexNormals();
+
+
+const terrainMaterial =
+    new THREE.MeshStandardMaterial({
+
+        color: 0x4b5b43,
+
+        roughness: 0.95,
+
+        metalness: 0.0
+    });
+
+
+const terrain =
+    new THREE.Mesh(
+        geometry,
+        terrainMaterial
+    );
+
+terrain.rotation.x =
+    -Math.PI / 2;
+
+terrain.receiveShadow = true;
+
+scene.add(terrain);
+
+
+/* =====================================================
+   DISTANT MOUNTAINS
+===================================================== */
+
+function createMountain(
+    x,
+    z,
+    scale
+) {
+
+    const mountainGeometry =
+        new THREE.ConeGeometry(
+            180 * scale,
+            300 * scale,
+            8
+        );
+
+    const mountainMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x39443f,
+            roughness: 1
+        });
+
+    const mountain =
+        new THREE.Mesh(
+            mountainGeometry,
+            mountainMaterial
+        );
+
+    mountain.position.set(
+        x,
+        100 * scale,
+        z
+    );
+
+    mountain.castShadow = true;
+    mountain.receiveShadow = true;
+
+    scene.add(mountain);
+}
+
+
+createMountain(-650,-650,2.0);
+createMountain(-300,-750,1.5);
+createMountain(100,-800,2.3);
+createMountain(550,-700,1.8);
+createMountain(850,-500,1.3);
+
+
+/* =====================================================
+   SIMPLE FOREST
+===================================================== */
+
+function createTree(x,z){
+
+    const trunkGeometry =
+        new THREE.CylinderGeometry(
+            1.2,
+            1.8,
+            12,
+            7
+        );
+
+    const trunkMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x3d3024,
+            roughness: 1
+        });
+
+    const trunk =
+        new THREE.Mesh(
+            trunkGeometry,
+            trunkMaterial
+        );
+
+    trunk.position.set(
+        x,
+        6,
+        z
+    );
+
+
+    const crownGeometry =
+        new THREE.ConeGeometry(
+            8,
+            28,
+            8
+        );
+
+    const crownMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x243c2b,
+            roughness: 1
+        });
+
+    const crown =
+        new THREE.Mesh(
+            crownGeometry,
+            crownMaterial
+        );
+
+    crown.position.set(
+        x,
+        23,
+        z
+    );
+
+    crown.castShadow = true;
+
+    scene.add(trunk);
+    scene.add(crown);
+}
+
+
+/*
+   Scatter forests
+*/
+
+for(let i=0;i<280;i++){
+
+    const x =
+        (Math.random() - .5) *
+        1400;
+
+    const z =
+        (Math.random() - .5) *
+        1100;
+
+    /*
+       Leave central clearing
+    */
+
+    if(
+        Math.abs(x)<180 &&
+        Math.abs(z)<180
+    ){
+        continue;
+    }
+
+    createTree(x,z);
+}
+
+
+/* =====================================================
+   WATER
+===================================================== */
+
+const waterGeometry =
+    new THREE.PlaneGeometry(
+        1400,
+        300
+    );
+
+const waterMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x294d5c,
+        roughness: .18,
+        metalness: .35,
+        transparent: true,
+        opacity: .82
+    });
+
+const water =
+    new THREE.Mesh(
+        waterGeometry,
+        waterMaterial
+    );
+
+water.rotation.x =
+    -Math.PI/2;
+
+water.position.set(
+    350,
+    1,
+    -250
+);
+
+scene.add(water);
+
+
+/* =====================================================
+   ROAD
+===================================================== */
+
+const roadGeometry =
+    new THREE.PlaneGeometry(
+        35,
+        1000
+    );
+
+const roadMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x292927,
+        roughness: 1
+    });
+
+const road =
+    new THREE.Mesh(
+        roadGeometry,
+        roadMaterial
+    );
+
+road.rotation.x =
+    -Math.PI/2;
+
+road.position.set(
+    0,
+    2,
+    0
+);
+
+scene.add(road);
+
+
+/* =====================================================
+   ANIMATION
+===================================================== */
+
+const clock =
+    new THREE.Clock();
+
+
+function animate(){
+
+    requestAnimationFrame(
+        animate
+    );
+
+    const time =
+        clock.getElapsedTime();
+
+
+    /*
+       Slight atmospheric movement
+    */
+
+    camera.position.y =
+        45 +
+        Math.sin(time * .15) * .5;
+
+
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+animate();
+
+
+/* =====================================================
+   RESIZE
+===================================================== */
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+        renderer.setPixelRatio(
+            Math.min(
+                window.devicePixelRatio,
+                2
+            )
+        );
+    }
+);
+
+
+/* =====================================================
+   CINEMATIC LOADING
+===================================================== */
+
+const loadingBar =
+    document.getElementById(
+        "loadingBar"
+    );
+
+const intro =
+    document.getElementById(
+        "intro"
+    );
+
+const hud =
+    document.getElementById(
+        "hud"
+    );
+
+let progress = 0;
+
+
+const loading =
+    setInterval(() => {
+
+        progress +=
+            Math.random() * 8;
+
+        if(progress>=100){
+
+            progress=100;
+
+            clearInterval(
+                loading
+            );
+
+            setTimeout(() => {
+
+                intro.classList.add(
+                    "hidden"
+                );
+
+                hud.classList.add(
+                    "visible"
+                );
+
+            },700);
+        }
+
+        loadingBar.style.width =
+            progress + "%";
+
+    },120);
+
+</script>
+
+</body>
+</html>
