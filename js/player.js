@@ -248,11 +248,11 @@ export class PlayerController {
 
 
         const forward =
-            new THREE.Vector3(
-                Math.sin(this.yaw),
-                0,
-                Math.cos(this.yaw)
-            );
+    new THREE.Vector3(
+        -Math.sin(this.yaw),
+        0,
+        -Math.cos(this.yaw)
+    );
 
 
         const right =
